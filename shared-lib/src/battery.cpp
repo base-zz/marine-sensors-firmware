@@ -17,7 +17,6 @@
 // ADC reference voltage in millivolts
 // nRF52840 internal reference is 0.6V with 1/6 gain = 3.6V range
 #define ADC_REF_MV          3600
-#define ADC_RESOLUTION      1024    // 10-bit ADC
 #define ADC_SAMPLES         4       // Average multiple readings
 
 void battery_init() {
@@ -36,7 +35,7 @@ uint16_t battery_read_mv() {
 
     // Convert ADC reading to millivolts
     // mv = (reading / max_reading) * reference_mv
-    uint16_t mv = (uint16_t)((avg * ADC_REF_MV) / ADC_RESOLUTION);
+    uint16_t mv = (uint16_t)((avg * ADC_REF_MV) / 1024);
 
     return mv;
 }
