@@ -1,0 +1,54 @@
+{
+  "configurations": [
+    {
+      "name": "PlatformIO Arduino nRF52840",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/cores/nRF5",
+        "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/variants/feather_nrf52840_express",
+        "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Bluefruit52Lib/src"
+      ],
+      "defines": [
+        "ARDUINO_NRF52840_FEATHER",
+        "NRF52840_XXAA",
+        "BILGE_MONITOR",
+        "DEBUG_SERIAL",
+        "F_CPU=64000000L",
+        "ARDUINO=10804",
+        "ARDUINO_ARCH_NRF52",
+        "ARDUINO_BSP_VERSION=\"1.7.0\"",
+        "ARDUINO_NRF52_ADAFRUIT",
+        "NRF52_SERIES",
+        "LFS_NAME_MAX=64",
+        "DX_CC_TEE",
+        "SOFTDEVICE_PRESENT",
+        "USBCON",
+        "USE_TINYUSB",
+        "USB_VID=0x239A",
+        "USB_PID=0x8029",
+        "USB_PRODUCT=\"Feather nRF52840 Express\"",
+        "USB_MANUFACTURER=\"Adafruit\"",
+        "CFG_DEBUG=0"
+      ],
+      "compilerPath": "/Users/basselabul-hajj/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+      "compilerArgs": [
+        "-mthumb",
+        "-mcpu=cortex-m4",
+        "-mfloat-abi=hard",
+        "-mfpu=fpv4-sp-d16"
+      ],
+      "intelliSenseMode": "gcc-arm",
+      "cStandard": "gnu11",
+      "cppStandard": "gnu++11",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/include",
+          "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/cores/nRF5",
+          "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/variants/feather_nrf52840_express",
+          "/Users/basselabul-hajj/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Bluefruit52Lib/src"
+        ]
+      }
+    }
+  ],
+  "version": 4
+}

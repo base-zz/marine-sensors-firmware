@@ -1,0 +1,10 @@
+{
+  "name": "marine-sensors-shared",
+  "version": "1.0.0",
+  "description": "Shared firmware library for Marine Bilge Monitor and Water Sensor",
+  "authors": {
+    "name": "Marine Sensors"
+  },
+  "frameworks": "arduino",
+  "platforms": "nordicnrf52"
+}
