@@ -14,79 +14,50 @@
 #include "battery.h"
 #include "ble_advertiser.h"
 #include "temperature.h"
-#include "water_config.h"
-
-// // ─────────────────────────────────────────────────────────────
-// // Electrode Pin Configuration
-// // AC differential excitation — mandatory to prevent electrolysis
-// // Both pins driven OUTPUT LOW during sleep — not Hi-Z
-// // ─────────────────────────────────────────────────────────────
-// #define PIN_ELECTRODE_A     2       // P0.02 — excitation drive
-// #define PIN_ELECTRODE_B     3       // P0.03 — sense + reverse drive
-
-// // ─────────────────────────────────────────────────────────────
-// // Wet Detection Threshold
-// // SET FROM BENCH TESTING
-// // Test with distilled water, tap water, salt water
-// // Must NOT trigger on condensation alone
-// // ─────────────────────────────────────────────────────────────
-// #define WET_THRESHOLD       512     // PLACEHOLDER — calibrate on bench
-
-// // ─────────────────────────────────────────────────────────────
-// // RTC Configuration
-// // RTC1 — 32768Hz / (prescaler+1)
-// // Prescaler 4095 → 8Hz tick rate
-// // 10 seconds = 80 ticks
-// // 24 hours = 691200 ticks
-// // ─────────────────────────────────────────────────────────────
-// #define RTC_PRESCALER               4095
-// #define RTC_HZ                      8
-// #define SENSE_INTERVAL_TICKS        (10 * RTC_HZ)       // 10 seconds
-// #define HEARTBEAT_TICKS             (24UL * 60 * 60 * RTC_HZ)
-// #define WATER_REPORT_TICKS          (60 * RTC_HZ)       // 60 seconds
-
-// // ─────────────────────────────────────────────────────────────
-// // State — Retention RAM
-// // Survives System ON sleep
-// // ─────────────────────────────────────────────────────────────
-// #define STATE_MAGIC     0xA5B6C7D8
 
 // ─────────────────────────────────────────────────────────────
-// Electrode Pin Configuration- defined in marine_packet.h to be used in other files
+// Electrode Pin Configuration
 // AC differential excitation — mandatory to prevent electrolysis
 // Both pins driven OUTPUT LOW during sleep — not Hi-Z
 // ─────────────────────────────────────────────────────────────
-// constexpr uint8_t PIN_ELECTRODE_A     = 2;       // P0.02 — excitation drive
-// constexpr uint8_t PIN_ELECTRODE_B     = 3;       // P0.03 — sense + reverse drive
+#define PIN_ELECTRODE_A 2  // P0.02 — excitation drive
+#define PIN_ELECTRODE_B 3  // P0.03 — sense + reverse drive
 
 // ─────────────────────────────────────────────────────────────
 // Wet Detection Threshold
+// SET FROM BENCH TESTING
+// Test with distilled water, tap water, salt water
+// Must NOT trigger on condensation alone
 // ─────────────────────────────────────────────────────────────
-constexpr uint16_t WET_THRESHOLD      = 512;     // Calibrate on bench (fits in 16-bit)
+#define WET_THRESHOLD 512  // PLACEHOLDER — calibrate on bench
 
 // ─────────────────────────────────────────────────────────────
 // RTC Configuration
+// RTC0 — 32768Hz / (prescaler+1)
+// Prescaler 4095 → 8Hz tick rate
+// 10 seconds = 80 ticks
+// 24 hours = 691200 ticks
 // ─────────────────────────────────────────────────────────────
-constexpr uint16_t RTC_PRESCALER      = 4095;
-constexpr uint8_t  RTC_HZ             = 8;
-
-// The compiler automatically calculates these math operations at compile-time
-constexpr uint8_t  SENSE_INTERVAL_TICKS = 10 * RTC_HZ;       // 80 ticks (fits in 8-bit)
-constexpr uint32_t HEARTBEAT_TICKS      = 24UL * 60 * 60 * RTC_HZ; // 691,200 ticks (needs 32-bit)
-constexpr uint16_t WATER_REPORT_TICKS   = 60 * RTC_HZ;       // 480 ticks (needs 16-bit)
+#define RTC_PRESCALER        4095
+#define RTC_HZ               8
+#define SENSE_INTERVAL_TICKS (10 * RTC_HZ)   // 10 seconds
+#define HEARTBEAT_TICKS      (24UL * 60 * 60 * RTC_HZ)
+#define WATER_REPORT_TICKS   (60 * RTC_HZ)   // 60 seconds
 
 // ─────────────────────────────────────────────────────────────
 // State — Retention RAM
+// Survives System ON sleep
 // ─────────────────────────────────────────────────────────────
-constexpr uint32_t STATE_MAGIC        = 0xA5B6C7D8; // Another excellent 32-bit Hexsignature
+#define STATE_MAGIC 0xA5B6C7D8
 
-static uint32_t state_magic         __attribute__((section(".non_init")));
-static uint8_t  is_wet              __attribute__((section(".non_init")));
-static uint32_t wet_start_tick      __attribute__((section(".non_init")));
-static uint32_t last_report_tick    __attribute__((section(".non_init")));
+static uint32_t state_magic        __attribute__((section(".non_init")));
+static uint8_t  is_wet             __attribute__((section(".non_init")));
+static uint32_t wet_start_tick     __attribute__((section(".non_init")));
+static uint32_t last_report_tick   __attribute__((section(".non_init")));
 static uint32_t last_heartbeat_tick __attribute__((section(".non_init")));
 
-void init_state() {
+void init_state()
+{
     if (state_magic != STATE_MAGIC) {
         is_wet              = 0;
         wet_start_tick      = 0;
@@ -100,17 +71,20 @@ void init_state() {
 // RTC Functions
 // ─────────────────────────────────────────────────────────────
 
-void rtc_init() {
+void rtc_init()
+{
     NRF_RTC0->PRESCALER   = RTC_PRESCALER;
     NRF_RTC0->TASKS_CLEAR = 1;
     NRF_RTC0->TASKS_START = 1;
 }
 
-uint32_t rtc_now() {
+uint32_t rtc_now()
+{
     return NRF_RTC0->COUNTER;
 }
 
-uint32_t rtc_elapsed(uint32_t since) {
+uint32_t rtc_elapsed(uint32_t since)
+{
     return (rtc_now() - since) & 0x00FFFFFF;  // 24-bit wrap
 }
 
@@ -118,7 +92,8 @@ uint32_t rtc_elapsed(uint32_t since) {
 // Electrode Control
 // ─────────────────────────────────────────────────────────────
 
-void electrodes_sleep() {
+void electrodes_sleep()
+{
     // Both pins OUTPUT LOW during sleep
     // Zero differential voltage = zero electrolysis
     // Prevents floating input cross-talk current
@@ -128,7 +103,8 @@ void electrodes_sleep() {
     nrf_gpio_pin_clear(PIN_ELECTRODE_B);
 }
 
-uint16_t electrodes_sense() {
+uint16_t electrodes_sense()
+{
     // AC differential excitation — two phase measurement
     // Phase 1: A HIGH, B LOW → current flows E1 to E2
     nrf_gpio_cfg_output(PIN_ELECTRODE_A);
@@ -157,7 +133,8 @@ uint16_t electrodes_sense() {
 // Wakes on RTC compare event via software interrupt
 // ─────────────────────────────────────────────────────────────
 
-void enter_sleep() {
+void enter_sleep()
+{
 #ifdef DEBUG_SERIAL
     Serial.println("Sleeping");
     Serial.flush();
@@ -167,10 +144,10 @@ void enter_sleep() {
     // Ensure electrodes are LOW before sleep
     electrodes_sleep();
 
-uint32_t next_wake = (rtc_now() + SENSE_INTERVAL_TICKS) & 0x00FFFFFF;
-    NRF_RTC0->CC[0]            = next_wake;
-    NRF_RTC0->EVTENSET         = RTC_EVTENSET_COMPARE0_Msk;
-    NRF_RTC0->INTENSET         = RTC_INTENSET_COMPARE0_Msk;
+    uint32_t next_wake = (rtc_now() + SENSE_INTERVAL_TICKS) & 0x00FFFFFF;
+    NRF_RTC0->CC[0]    = next_wake;
+    NRF_RTC0->EVTENSET = RTC_EVTENSET_COMPARE0_Msk;
+    NRF_RTC0->INTENSET = RTC_INTENSET_COMPARE0_Msk;
     NRF_RTC0->EVENTS_COMPARE[0] = 0;
 
     NVIC_SetPriority(RTC0_IRQn, 7);
@@ -182,12 +159,13 @@ uint32_t next_wake = (rtc_now() + SENSE_INTERVAL_TICKS) & 0x00FFFFFF;
     __WFE();
 
     NVIC_DisableIRQ(RTC0_IRQn);
-    NRF_RTC0->INTENCLR         = RTC_INTENCLR_COMPARE0_Msk;
+    NRF_RTC0->INTENCLR = RTC_INTENCLR_COMPARE0_Msk;
     NRF_RTC0->EVENTS_COMPARE[0] = 0;
 }
 
-// RTC1 interrupt handler — just wake, do nothing
-extern "C" void RTC0_IRQHandler() {
+// RTC0 interrupt handler — just wake, do nothing
+extern "C" void RTC0_IRQHandler()
+{
     NRF_RTC0->EVENTS_COMPARE[0] = 0;
 }
 
@@ -195,35 +173,51 @@ extern "C" void RTC0_IRQHandler() {
 // Packet Transmission Helpers
 // ─────────────────────────────────────────────────────────────
 
-void transmit_water_detected() {
+void transmit_water_detected()
+{
     MarinePacket packet;
     packet_init(&packet, EVENT_WATER_DETECTED);
+
+    packet.data.simple.nexus_marker  = NEXUS_MARKER;
     packet.data.simple.temperature_c = temperature_read_c();
+
     ble_transmit(&packet);
 }
 
-void transmit_water_present() {
+void transmit_water_present()
+{
     MarinePacket packet;
     packet_init(&packet, EVENT_WATER_PRESENT);
-    packet.data.water_present.temperature_c = temperature_read_c();
-    packet.data.water_present.elapsed_secs  =
+
+    packet.data.water_present.nexus_marker   = NEXUS_MARKER;
+    packet.data.water_present.temperature_c  = temperature_read_c();
+    packet.data.water_present.elapsed_secs   =
         (uint16_t)(rtc_elapsed(wet_start_tick) / RTC_HZ);
+
     ble_transmit(&packet);
 }
 
-void transmit_water_cleared() {
+void transmit_water_cleared()
+{
     MarinePacket packet;
     packet_init(&packet, EVENT_WATER_CLEARED);
+
+    packet.data.water_cleared.nexus_marker  = NEXUS_MARKER;
     packet.data.water_cleared.temperature_c = temperature_read_c();
     packet.data.water_cleared.duration_secs =
         (uint16_t)(rtc_elapsed(wet_start_tick) / RTC_HZ);
+
     ble_transmit(&packet);
 }
 
-void transmit_heartbeat() {
+void transmit_heartbeat()
+{
     MarinePacket packet;
     packet_init(&packet, EVENT_WATER_HEARTBEAT);
+
+    packet.data.simple.nexus_marker  = NEXUS_MARKER;
     packet.data.simple.temperature_c = temperature_read_c();
+
     ble_transmit(&packet);
 
     // Open DFU window after heartbeat
@@ -234,7 +228,8 @@ void transmit_heartbeat() {
 // Main State Machine
 // ─────────────────────────────────────────────────────────────
 
-void setup() {
+void setup()
+{
 #ifdef DEBUG_SERIAL
     Serial.begin(115200);
     delay(500);
@@ -261,8 +256,8 @@ void setup() {
     while (true) {
 
         // Read conductivity via AC differential excitation
-        uint16_t conductivity = electrodes_sense();
-        bool currently_wet = (conductivity > WET_THRESHOLD);
+        uint16_t conductivity  = electrodes_sense();
+        bool currently_wet     = (conductivity > WET_THRESHOLD);
 
 #ifdef DEBUG_SERIAL
         Serial.print("Conductivity: ");
@@ -308,6 +303,7 @@ void setup() {
     }
 }
 
-void loop() {
+void loop()
+{
     // Never reached — main loop is inside setup()
 }

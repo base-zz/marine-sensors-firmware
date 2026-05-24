@@ -247,15 +247,13 @@ void transmit_pump_running(uint16_t field_now)
     MarinePacket packet;
     packet_init(&packet, EVENT_PUMP_RUNNING);
 
-    uint32_t elapsed   = (millis() / 1000) - run_start_sec;
-    uint16_t field_avg = run_sample_count > 0
-                             ? (uint16_t)(run_field_avg)
-                             : field_now;
+    uint32_t elapsed = (millis() / 1000) - run_start_sec;
 
-    packet.data.pump_running.elapsed_secs      = (uint16_t)elapsed;
+    packet.data.pump_running.nexus_marker       = NEXUS_MARKER;
+    packet.data.pump_running.elapsed_secs       = (uint16_t)elapsed;
     packet.data.pump_running.field_strength_now = field_now;
-    packet.data.pump_running.field_strength_avg = field_avg;
     packet.data.pump_running.field_strength_max = run_field_max;
+    packet.data.pump_running.reserved           = 0;
 
     pmos_connect();
     ble_transmit(&packet);
@@ -272,6 +270,7 @@ void transmit_pump_complete()
                              ? (uint16_t)(run_field_avg)
                              : 0;
 
+    packet.data.pump_complete.nexus_marker       = NEXUS_MARKER;
     packet.data.pump_complete.duration_secs      = (uint16_t)duration;
     packet.data.pump_complete.field_strength_avg = field_avg;
     packet.data.pump_complete.field_strength_max = run_field_max;
@@ -286,6 +285,8 @@ void transmit_heartbeat()
 {
     MarinePacket packet;
     packet_init(&packet, EVENT_BILGE_HEARTBEAT);
+
+    packet.data.simple.nexus_marker  = NEXUS_MARKER;
     packet.data.simple.temperature_c = temperature_read_c();
 
     pmos_connect();
