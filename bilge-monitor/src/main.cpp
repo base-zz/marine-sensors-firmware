@@ -15,6 +15,7 @@
 #include "battery.h"
 #include "ble_advertiser.h"
 #include "temperature.h"
+#include "bilge_config.h"
 
 // ─────────────────────────────────────────────────────────────
 // TMAG5273 I2C Configuration

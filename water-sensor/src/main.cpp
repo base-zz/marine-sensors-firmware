@@ -14,41 +14,71 @@
 #include "battery.h"
 #include "ble_advertiser.h"
 #include "temperature.h"
+#include "water_config.h"
+
+// // ─────────────────────────────────────────────────────────────
+// // Electrode Pin Configuration
+// // AC differential excitation — mandatory to prevent electrolysis
+// // Both pins driven OUTPUT LOW during sleep — not Hi-Z
+// // ─────────────────────────────────────────────────────────────
+// #define PIN_ELECTRODE_A     2       // P0.02 — excitation drive
+// #define PIN_ELECTRODE_B     3       // P0.03 — sense + reverse drive
+
+// // ─────────────────────────────────────────────────────────────
+// // Wet Detection Threshold
+// // SET FROM BENCH TESTING
+// // Test with distilled water, tap water, salt water
+// // Must NOT trigger on condensation alone
+// // ─────────────────────────────────────────────────────────────
+// #define WET_THRESHOLD       512     // PLACEHOLDER — calibrate on bench
+
+// // ─────────────────────────────────────────────────────────────
+// // RTC Configuration
+// // RTC1 — 32768Hz / (prescaler+1)
+// // Prescaler 4095 → 8Hz tick rate
+// // 10 seconds = 80 ticks
+// // 24 hours = 691200 ticks
+// // ─────────────────────────────────────────────────────────────
+// #define RTC_PRESCALER               4095
+// #define RTC_HZ                      8
+// #define SENSE_INTERVAL_TICKS        (10 * RTC_HZ)       // 10 seconds
+// #define HEARTBEAT_TICKS             (24UL * 60 * 60 * RTC_HZ)
+// #define WATER_REPORT_TICKS          (60 * RTC_HZ)       // 60 seconds
+
+// // ─────────────────────────────────────────────────────────────
+// // State — Retention RAM
+// // Survives System ON sleep
+// // ─────────────────────────────────────────────────────────────
+// #define STATE_MAGIC     0xA5B6C7D8
 
 // ─────────────────────────────────────────────────────────────
-// Electrode Pin Configuration
+// Electrode Pin Configuration- defined in marine_packet.h to be used in other files
 // AC differential excitation — mandatory to prevent electrolysis
 // Both pins driven OUTPUT LOW during sleep — not Hi-Z
 // ─────────────────────────────────────────────────────────────
-#define PIN_ELECTRODE_A     2       // P0.02 — excitation drive
-#define PIN_ELECTRODE_B     3       // P0.03 — sense + reverse drive
+// constexpr uint8_t PIN_ELECTRODE_A     = 2;       // P0.02 — excitation drive
+// constexpr uint8_t PIN_ELECTRODE_B     = 3;       // P0.03 — sense + reverse drive
 
 // ─────────────────────────────────────────────────────────────
 // Wet Detection Threshold
-// SET FROM BENCH TESTING
-// Test with distilled water, tap water, salt water
-// Must NOT trigger on condensation alone
 // ─────────────────────────────────────────────────────────────
-#define WET_THRESHOLD       512     // PLACEHOLDER — calibrate on bench
+constexpr uint16_t WET_THRESHOLD      = 512;     // Calibrate on bench (fits in 16-bit)
 
 // ─────────────────────────────────────────────────────────────
 // RTC Configuration
-// RTC1 — 32768Hz / (prescaler+1)
-// Prescaler 4095 → 8Hz tick rate
-// 10 seconds = 80 ticks
-// 24 hours = 691200 ticks
 // ─────────────────────────────────────────────────────────────
-#define RTC_PRESCALER               4095
-#define RTC_HZ                      8
-#define SENSE_INTERVAL_TICKS        (10 * RTC_HZ)       // 10 seconds
-#define HEARTBEAT_TICKS             (24UL * 60 * 60 * RTC_HZ)
-#define WATER_REPORT_TICKS          (60 * RTC_HZ)       // 60 seconds
+constexpr uint16_t RTC_PRESCALER      = 4095;
+constexpr uint8_t  RTC_HZ             = 8;
+
+// The compiler automatically calculates these math operations at compile-time
+constexpr uint8_t  SENSE_INTERVAL_TICKS = 10 * RTC_HZ;       // 80 ticks (fits in 8-bit)
+constexpr uint32_t HEARTBEAT_TICKS      = 24UL * 60 * 60 * RTC_HZ; // 691,200 ticks (needs 32-bit)
+constexpr uint16_t WATER_REPORT_TICKS   = 60 * RTC_HZ;       // 480 ticks (needs 16-bit)
 
 // ─────────────────────────────────────────────────────────────
 // State — Retention RAM
-// Survives System ON sleep
 // ─────────────────────────────────────────────────────────────
-#define STATE_MAGIC     0xA5B6C7D8
+constexpr uint32_t STATE_MAGIC        = 0xA5B6C7D8; // Another excellent 32-bit Hexsignature
 
 static uint32_t state_magic         __attribute__((section(".non_init")));
 static uint8_t  is_wet              __attribute__((section(".non_init")));

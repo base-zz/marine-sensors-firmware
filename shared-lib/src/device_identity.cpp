@@ -32,7 +32,7 @@ uint32_t get_device_id() {
     return NRF_FICR->DEVICEID[0];
 }
 
-#define RETENTION_MAGIC 0xDEADBEEF
+constexpr uint32_t RETENTION_MAGIC = 0xDEADBEEF;
 
 static uint8_t  seq_number __attribute__((section(".non_init")));
 static uint32_t seq_magic  __attribute__((section(".non_init")));

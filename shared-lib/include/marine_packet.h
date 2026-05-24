@@ -111,9 +111,7 @@ static_assert(sizeof(MarinePacket) == 23, "MarinePacket must be 23 bytes");
 // ─────────────────────────────────────────────────────────────
 // Pin Definitions — matches PCB netlist
 // ─────────────────────────────────────────────────────────────
-#define PIN_PMOS_CTRL       2       // P0.02 — BSS84 gate (bilge monitor)
 #define PIN_TMAG_INT        5       // P0.05 — TMAG5273 interrupt
-#define PIN_ELECTRODE_A     2       // P0.02 — Excitation (water sensor)
 #define PIN_ELECTRODE_B     3       // P0.03 — Sense (water sensor)
 
 // ─────────────────────────────────────────────────────────────
