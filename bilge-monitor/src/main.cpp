@@ -3,7 +3,7 @@
 // Nordic nRF52840 via Raytac MDBT50Q-1MV2
 // Adafruit nRF52 Arduino core / PlatformIO
 //
-// Sleep: System ON low-power (~4.8uA total)
+// Sleep: System OFF low-power (~4.8uA total)
 // Wake:  TMAG5273 INT pin GPIO sense on P0.05
 // ─────────────────────────────────────────────────────────────
 
@@ -20,10 +20,10 @@
 // ─────────────────────────────────────────────────────────────
 // TMAG5273 I2C Configuration
 // ─────────────────────────────────────────────────────────────
-#define TMAG5273_ADDR 0x35
-#define TMAG5273_REG_RESULT 0x02  // Z-axis result register
-#define TMAG5273_REG_CONFIG1 0x01 // Configuration register 1
-#define TMAG5273_REG_CONFIG2 0x03 // Configuration register 2
+#define TMAG5273_ADDR        0x35
+#define TMAG5273_REG_RESULT  0x02  // Z-axis result register
+#define TMAG5273_REG_CONFIG1 0x01  // Configuration register 1
+#define TMAG5273_REG_CONFIG2 0x03  // Configuration register 2
 
 // Wake-on-threshold mode value — duty cycles at ~1uA
 #define TMAG5273_WAKE_MODE 0x02
@@ -31,7 +31,7 @@
 // Detection threshold — SET THIS FROM BENCH TESTING
 // Start conservative. Validate with Rule 500 pump at groove distance.
 // Target: 30-40% of weakest pump peak Z-axis reading.
-#define TMAG5273_THRESHOLD 500 // PLACEHOLDER — calibrate on bench
+#define TMAG5273_THRESHOLD 500  // PLACEHOLDER — calibrate on bench
 
 // ─────────────────────────────────────────────────────────────
 // Run Tracking — Retention RAM
@@ -39,21 +39,21 @@
 // ─────────────────────────────────────────────────────────────
 #define RUN_MAGIC 0xCAFEBABE
 
-static uint32_t run_start_sec __attribute__((section(".non_init")));
-static uint16_t run_field_avg   __attribute__((section(".non_init")));  
-static uint16_t run_field_max __attribute__((section(".non_init")));
+static uint32_t run_start_sec    __attribute__((section(".non_init")));
+static uint16_t run_field_avg    __attribute__((section(".non_init")));
+static uint16_t run_field_max    __attribute__((section(".non_init")));
 static uint16_t run_sample_count __attribute__((section(".non_init")));
-static uint32_t run_magic __attribute__((section(".non_init")));
+static uint32_t run_magic        __attribute__((section(".non_init")));
 
 void init_run_tracking()
 {
     if (run_magic != RUN_MAGIC)
     {
-        run_start_sec = 0;
-        run_field_avg = 0;
-        run_field_max = 0;
+        run_start_sec    = 0;
+        run_field_avg    = 0;
+        run_field_max    = 0;
         run_sample_count = 0;
-        run_magic = RUN_MAGIC;
+        run_magic        = RUN_MAGIC;
     }
 }
 
@@ -84,7 +84,7 @@ bool tmag5273_init()
         uint8_t err = Wire.endTransmission();
         if (err == 0)
         {
-            return true; // TMAG5273 responding
+            return true;  // TMAG5273 responding
         }
         delay(I2C_BOOT_DELAY_MS);
     }
@@ -107,7 +107,7 @@ uint16_t tmag5273_read_z()
         return 0xFFFF;
 
     uint16_t high = Wire.read();
-    uint16_t low = Wire.read();
+    uint16_t low  = Wire.read();
     return (high << 8) | low;
 }
 
@@ -132,7 +132,7 @@ bool tmag5273_rearm()
 void pmos_connect()
 {
     digitalWrite(PIN_PMOS_CTRL, LOW);
-    delay(1); // Brief settling time
+    delay(1);  // Brief settling time
 }
 
 void pmos_disconnect()
@@ -140,26 +140,30 @@ void pmos_disconnect()
     digitalWrite(PIN_PMOS_CTRL, HIGH);
 }
 
-
 // ─────────────────────────────────────────────────────────────
-// RTC Heartbeat Timer
+// RTC Heartbeat Timer + Uptime Tracking
 // Uses nRF52840 internal RTC1 to track time between heartbeats
+// and total device uptime across System OFF sleep cycles.
 // RTC1 runs at 32768Hz / (prescaler+1)
 // Prescaler 4095 → 8Hz tick rate
 // 24 hours = 24 * 60 * 60 * 8 = 691200 ticks
 // RTC counter is 24-bit → max ~24.2 days. Sufficient.
 // ─────────────────────────────────────────────────────────────
 
-#define RTC_PRESCALER           4095
-#define RTC_HZ                  8
-#define HEARTBEAT_TICKS         (24UL * 60 * 60 * RTC_HZ)
+#define RTC_PRESCALER   4095
+#define RTC_HZ          8
+#define HEARTBEAT_TICKS (24UL * 60 * 60 * RTC_HZ)
 
-#define HEARTBEAT_MAGIC         0xBEEFCAFE
+#define HEARTBEAT_MAGIC 0xBEEFCAFE
+#define UPTIME_MAGIC    0xDEADBEEF
 
 static uint32_t last_heartbeat_tick __attribute__((section(".non_init")));
 static uint32_t heartbeat_magic     __attribute__((section(".non_init")));
+static uint32_t first_boot_tick     __attribute__((section(".non_init")));
+static uint32_t uptime_magic        __attribute__((section(".non_init")));
 
-void init_heartbeat_timer() {
+void init_heartbeat_timer()
+{
     // Start RTC1
     NRF_RTC1->PRESCALER   = RTC_PRESCALER;
     NRF_RTC1->TASKS_CLEAR = 1;
@@ -172,14 +176,31 @@ void init_heartbeat_timer() {
     }
 }
 
-bool heartbeat_due() {
+bool heartbeat_due()
+{
     uint32_t now     = NRF_RTC1->COUNTER;
-    uint32_t elapsed = (now - last_heartbeat_tick) & 0x00FFFFFF; // 24-bit wrap
+    uint32_t elapsed = (now - last_heartbeat_tick) & 0x00FFFFFF;  // 24-bit wrap
     return elapsed >= HEARTBEAT_TICKS;
 }
 
-void update_heartbeat_tick() {
+void update_heartbeat_tick()
+{
     last_heartbeat_tick = NRF_RTC1->COUNTER;
+}
+
+void init_uptime()
+{
+    // RTC1 must already be started by init_heartbeat_timer()
+    if (uptime_magic != UPTIME_MAGIC) {
+        first_boot_tick = NRF_RTC1->COUNTER;
+        uptime_magic    = UPTIME_MAGIC;
+    }
+}
+
+uint32_t get_uptime_seconds()
+{
+    uint32_t elapsed_ticks = (NRF_RTC1->COUNTER - first_boot_tick) & 0x00FFFFFF;
+    return elapsed_ticks / RTC_HZ;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -191,7 +212,7 @@ void update_heartbeat_tick() {
 void enter_sleep()
 {
 #ifdef DEBUG_SERIAL
-    Serial.println("Entering System ON low-power sleep");
+    Serial.println("Entering System OFF sleep");
     Serial.flush();
     delay(10);
 #endif
@@ -209,7 +230,7 @@ void enter_sleep()
     // Clear pending PORT events to prevent spurious wake
     NRF_GPIOTE->EVENTS_PORT = 0;
 
-    // System ON low-power sleep
+    // System OFF sleep
     // CPU halts, LFCLK and RTC keep running
     // Wakes on TMAG5273 INT going LOW
     __WFE();
@@ -226,12 +247,12 @@ void transmit_pump_running(uint16_t field_now)
     MarinePacket packet;
     packet_init(&packet, EVENT_PUMP_RUNNING);
 
-    uint32_t elapsed = (millis() / 1000) - run_start_sec;
+    uint32_t elapsed   = (millis() / 1000) - run_start_sec;
     uint16_t field_avg = run_sample_count > 0
                              ? (uint16_t)(run_field_avg)
                              : field_now;
 
-    packet.data.pump_running.elapsed_secs = (uint16_t)elapsed;
+    packet.data.pump_running.elapsed_secs      = (uint16_t)elapsed;
     packet.data.pump_running.field_strength_now = field_now;
     packet.data.pump_running.field_strength_avg = field_avg;
     packet.data.pump_running.field_strength_max = run_field_max;
@@ -246,15 +267,15 @@ void transmit_pump_complete()
     MarinePacket packet;
     packet_init(&packet, EVENT_PUMP_RUN_COMPLETE);
 
-    uint32_t duration = (millis() / 1000) - run_start_sec;
+    uint32_t duration  = (millis() / 1000) - run_start_sec;
     uint16_t field_avg = run_sample_count > 0
                              ? (uint16_t)(run_field_avg)
                              : 0;
 
-    packet.data.pump_complete.duration_secs = (uint16_t)duration;
+    packet.data.pump_complete.duration_secs      = (uint16_t)duration;
     packet.data.pump_complete.field_strength_avg = field_avg;
     packet.data.pump_complete.field_strength_max = run_field_max;
-    packet.data.pump_complete.reserved = 0;
+    packet.data.pump_complete.reserved           = 0;
 
     pmos_connect();
     ble_transmit(&packet);
@@ -289,16 +310,21 @@ void setup()
 #endif
 
     // Initialize retention RAM — must be first
+    // init_uptime() must come after init_heartbeat_timer() (RTC1 dependency)
     init_sequence_number();
     init_run_tracking();
     init_heartbeat_timer();
-    
+    init_uptime();
+
+    // Set elapsed_seconds in BLE packets to real uptime across sleep cycles
+    ble_set_uptime_override(get_uptime_seconds());
+
     // ── READ RESET REASON ─────────────────────────────────────
     // Distinguish System OFF GPIO DETECT wake from other resets
     // Bit 16 = System OFF wake (legitimate pump or RTC wake)
     // Bit 0  = PIN reset, Bit 3 = soft reset, Bit 2 = watchdog
     uint32_t reset_reason = NRF_POWER->RESETREAS;
-    NRF_POWER->RESETREAS = 0xFFFFFFFF;  // Clear all flags
+    NRF_POWER->RESETREAS  = 0xFFFFFFFF;  // Clear all flags
 
     bool woke_from_system_off = (reset_reason & 0x00010000);
 
@@ -387,7 +413,7 @@ void setup()
 
     uint32_t last_report_ms = millis();
 
-// ── MONITORING LOOP ───────────────────────────────────────
+    // ── MONITORING LOOP ───────────────────────────────────────
     while (true)
     {
         delay(1000);

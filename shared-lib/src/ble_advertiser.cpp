@@ -41,27 +41,40 @@ static constexpr uint8_t BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED = 1;
 #include "device_identity.h"
 #include "battery.h"
 
-static uint32_t boot_time_sec = 0;
+static uint32_t boot_time_sec      = 0;
+static uint32_t uptime_override    = 0;
+static bool     use_uptime_override = false;
 
-void ble_init() {
+void ble_init()
+{
     Bluefruit.begin();
     Bluefruit.setTxPower(0);
     Bluefruit.setName("MarineSensor");
     boot_time_sec = millis() / 1000;
 }
 
-void packet_init(MarinePacket* packet, EventType event_type) {
+void ble_set_uptime_override(uint32_t seconds)
+{
+    uptime_override     = seconds;
+    use_uptime_override = true;
+}
+
+void packet_init(MarinePacket* packet, EventType event_type)
+{
     memset(packet, 0, sizeof(MarinePacket));
-    packet->company_id       = COMPANY_ID;
-    packet->device_id        = get_device_id();
-    packet->event_type       = (uint8_t)event_type;
-    packet->sequence_number  = next_sequence_number();
-    packet->elapsed_seconds  = (millis() / 1000) - boot_time_sec;
-    packet->battery_mv       = battery_read_mv();
+    packet->company_id      = COMPANY_ID;
+    packet->device_id       = get_device_id();
+    packet->event_type      = (uint8_t)event_type;
+    packet->sequence_number = next_sequence_number();
+    packet->elapsed_seconds = use_uptime_override
+                                  ? uptime_override
+                                  : (millis() / 1000) - boot_time_sec;
+    packet->battery_mv      = battery_read_mv();
     packet->firmware_version = FIRMWARE_VERSION;
 }
 
-void ble_transmit(MarinePacket* packet) {
+void ble_transmit(MarinePacket* packet)
+{
     Bluefruit.Advertising.clearData();
     Bluefruit.Advertising.addManufacturerData(packet, sizeof(MarinePacket));
     Bluefruit.Advertising.setType(BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED);
@@ -82,11 +95,14 @@ void ble_transmit(MarinePacket* packet) {
     Serial.print(packet->sequence_number);
     Serial.print(" bat=");
     Serial.print(packet->battery_mv);
-    Serial.println("mV");
+    Serial.print("mV uptime=");
+    Serial.print(packet->elapsed_seconds);
+    Serial.println("s");
 #endif
 }
 
-void ble_start_dfu_window() {
+void ble_start_dfu_window()
+{
 #ifdef DEBUG_SERIAL
     Serial.println("DFU window open — 10 seconds");
 #endif
@@ -99,6 +115,7 @@ void ble_start_dfu_window() {
 #endif
 }
 
-void ble_stop() {
+void ble_stop()
+{
     Bluefruit.Advertising.stop();
 }
